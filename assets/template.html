@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>Design vs implementation</title>
+<style>
+  :root { --bg:#f6f6f8; --fg:#16161a; --muted:#6b6b76; --line:#e2e2e8; --acc:#6d28d9; --card:#fff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; background:var(--bg); color:var(--fg); }
+  header { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--line); padding:12px 24px 0; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:4px; max-width:1100px; }
+  .builds { color:var(--muted); font-size:12px; margin-bottom:10px; }
+  .builds b { color:var(--fg); font-weight:600; }
+  .tabs { display:flex; gap:4px; flex-wrap:wrap; }
+  .tabs button { border:1px solid var(--line); background:#fff; padding:7px 14px; border-radius:8px 8px 0 0; cursor:pointer; font:inherit; font-size:14px; border-bottom:none; }
+  .tabs button.on { background:var(--acc); color:#fff; border-color:var(--acc); }
+  .tabs button .nd { font-size:11px; opacity:.7; margin-left:4px; }
+  .bar { position:sticky; top:var(--hh,96px); z-index:4; background:var(--bg); display:flex; align-items:center; gap:14px 18px; padding:12px 24px; flex-wrap:wrap; border-bottom:1px solid var(--line); }
+  .seg { display:flex; gap:0; border:1px solid var(--line); border-radius:9px; overflow:hidden; background:#fff; }
+  .seg:empty { display:none; }
+  .seg button { border:0; background:transparent; padding:7px 12px; cursor:pointer; font:inherit; font-size:13px; border-right:1px solid var(--line); }
+  .seg button:last-child { border-right:0; }
+  .seg button.on { background:var(--fg); color:#fff; }
+  .seg button:disabled { color:#b5b5bf; cursor:default; }
+  .ctl { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); }
+  .ctl input[type=range] { width:180px; accent-color:var(--acc); }
+  .legend { font-size:13px; color:var(--muted); margin-left:auto; }
+  .legend b { color:var(--fg); }
+  main { padding:18px 24px 80px; }
+  .sec { background:var(--card); border:1px solid var(--line); border-radius:12px; margin:0 0 18px; overflow:hidden; }
+  .sec h3 { margin:0; padding:10px 14px; font-size:14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:12px; }
+  .sec h3 .meta { font-weight:400; color:var(--muted); font-size:12px; }
+  .sec h3 a { font-weight:400; font-size:12px; color:var(--acc); white-space:nowrap; }
+  .pairs { display:flex; gap:12px; padding:12px; justify-content:center; flex-wrap:wrap; background:#fafafb; }
+  .pair { position:relative; flex:1 1 0; min-width:0; }
+  .pair canvas { display:block; width:100%; height:auto; margin:0 auto; background:#ddd; cursor:col-resize; }
+  .pair.fade canvas, .pair.diff canvas { cursor:move; }
+  .sec img.side { display:block; max-width:100%; height:auto; margin:0 auto; cursor:zoom-in; }
+  .sec.narrow .pair, .sec.narrow img.side { max-width:var(--nw,520px); }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:6px; background:#ede9fe; color:#5b21b6; font-weight:600; margin-right:6px; }
+  .tag.set { background:#dcfce7; color:#166534; } .tag.set.old { background:#f3f4f6; color:#4b5563; }
+  .sev-high { background:#fee2e2; color:#991b1b; } .sev-medium { background:#fef3c7; color:#92400e; } .sev-low { background:#e0f2fe; color:#075985; } .sev-question { background:#f3e8ff; color:#6b21a8; } .sev-info { background:#f3f4f6; color:#374151; }
+  .note { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:0 0 18px; font-size:14px; }
+  .empty { color:var(--muted); padding:20px; }
+  .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:10px 14px; margin:0 0 18px; font-size:13px; }
+  .ok { background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:10px 14px; margin:0 0 18px; font-size:14px; }
+  .bad { background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:10px 14px; margin:0 0 18px; font-size:14px; }
+  .lb { position:fixed; inset:0; background:rgba(0,0,0,.85); display:none; overflow:auto; z-index:10; cursor:zoom-out; }
+  .lb img { display:block; margin:20px auto; max-width:none; }
+  table.score { border-collapse:collapse; background:#fff; border:1px solid var(--line); font-size:13px; margin:0 0 6px; }
+  table.score th, table.score td { border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.score th { background:#f3f3f6; font-weight:600; }
+  table.score td.c { cursor:pointer; font-variant-numeric:tabular-nums; }
+  table.score td.c:hover { outline:2px solid var(--acc); outline-offset:-2px; }
+  td.PASS { background:#dcfce7; color:#166534; } td.WARN { background:#fef3c7; color:#92400e; } td.FAIL { background:#fee2e2; color:#991b1b; }
+  td.ERROR, td.NOTRUN, td.SKIP { background:#e5e7eb; color:#374151; }
+  td.c.sel { outline:3px solid var(--acc); outline-offset:-3px; }
+  td.c small { color:inherit; opacity:.75; }
+  td.SAME { background:#dcfce7; color:#166534; } td.DIFF { background:#fee2e2; color:#991b1b; }
+  .trio { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; padding:12px; background:#fafafb; }
+  .trio figure { margin:0; } .trio figcaption { font-size:12px; color:var(--muted); text-align:center; margin-bottom:6px; }
+  .trio img { display:block; width:100%; height:auto; background:#ddd; cursor:zoom-in; }
+  .scoresum { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
+  .scoresum span { background:#fff; border:1px solid var(--line); border-radius:8px; padding:4px 10px; font-size:13px; }
+  .hint { font-size:12px; color:var(--muted); }
+  ul.plain { margin:6px 0 0; padding-left:20px; font-size:13px; } code { font:12px ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<header id="hdr">
+  <h1 id="title"></h1>
+  <div class="sub" id="sub"></div>
+  <div class="builds" id="builds"></div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<div class="bar" id="bar">
+  <div class="seg" id="vers"></div>
+  <div class="seg" id="refs"></div>
+  <div class="seg" id="views"></div>
+  <div class="seg" id="modes"></div>
+  <div class="ctl" id="ctl"></div>
+  <div class="legend" id="legend"></div>
+</div>
+<main id="main"></main>
+<div class="lb" id="lb" onclick="this.style.display='none'"><img id="lbimg" alt=""></div>
+<script>
+/*DATA*/
+const I18N = {
+  en: {
+    findings:'Findings', score:'Pixel-perfect', regress:'Regression A vs B', swipe:'Swipe', fade:'Opacity', diff:'Difference', side:'Side by side',
+    desktop:'Desktop', mobile:'Mobile', ours:'ours', figma:'Figma', openFile:'open file', overview:'Whole page (scaled {s}%)', part:'part',
+    noImages:'No images for this view.', noView:'This page has no {v} frame.', noDesign:'no design',
+    noDesignNote:'This page has no Figma comp: our sections only, for review by eye. No scoreboard.',
+    hint_swipe:'Move the mouse over a picture: left of the line is <b>Figma</b>, right is <b>ours</b>.',
+    hint_fade:'Ours over Figma; the slider is our opacity (0% = Figma only). Drag the picture to align; double-click resets.',
+    hint_diff:'Matching pixels are black, light areas differ. Drag the picture to align; double-click resets. Pink = one side is shorter.',
+    hint_side:'The raw composite: Figma first (left), ours second.',
+    shifted:'ours shifted {x}, {y} px (double-click resets)', oursOpacity:'ours:',
+    page:'Page', figmaH:'Figma {f}px · ours {o}px', delta:'Δh {d}px', oursH:'ours {o}px',
+    built:'Gallery built {t} (v={v})', setBuild:'{l} — {b}',
+    scoreHint:'Click a cell: capture | Figma | diff (pixel-diff; red = differs).',
+    scoreNote:'Each section diffed against its Figma node by the pixel-perfect skill (step 5). In brackets: height/width difference in CSS px, ours minus Figma. pixel-diff aligns top-left, so one taller element shifts everything below it — use the % to rank and track, judge on the diff image.',
+    refNote:'Reference set "{r}". ¹ = a corrected reference replaced the Figma export for this cell (hover for why).',
+    section:'Section', mean:'P/W/F · mean', worst:'10 worst sections', worstCols:['#','Page · section · view','Diff','Figma vs ours (CSS px)','Note'],
+    capture:'Ours (capture)', ref:'Figma (reference)', diffImg:'Difference (pixel-diff)', noShot:'no image', node:'node',
+    findNote:'Findings with evidence. Severity: high / medium / low; "question" = for the designer.',
+    noScore:'No scoreboard for this capture set.', total:'Total',
+    rgSame:'IDENTICAL — every page view: 0 changed pixels, same &lt;head&gt;, status, console and images.', rgDiff:'DIFFERENT — {n} of {m} page views differ.',
+    rgRules:'Rules: {r}.', rgMasked:'Masked (not compared): {m}; videos: {v}.', rgNothing:'nothing',
+    rgCols:['Page · view','Status A/B','Changed px','Size','Head','Console A/B','Broken img A/B','Result'], same:'same', identical:'identical', differs:'differs',
+    rgHead:'&lt;head&gt; differences', rgSections:'Sections', rgDiffImg:'A | B | changed pixels (red), cropped to the changed area'
+  },
+  ru: {
+    findings:'Найденные расхождения', score:'Pixel-perfect', regress:'Регрессия A и B', swipe:'Шторка', fade:'Прозрачность', diff:'Разница', side:'Рядом',
+    desktop:'Десктоп', mobile:'Мобильная', ours:'наша', figma:'Figma', openFile:'открыть файл', overview:'Вся страница (масштаб {s}%)', part:'часть',
+    noImages:'Нет снимков для этого вида.', noView:'У этой страницы нет кадра {v}.', noDesign:'без макета',
+    noDesignNote:'У этой страницы нет макета Figma: только наши секции, для проверки глазами. Без таблицы pixel-perfect.',
+    hint_swipe:'Водите мышью по картинке: слева от линии — <b>Figma</b>, справа — <b>наша</b>.',
+    hint_fade:'Наша страница поверх Figma; ползунок — её непрозрачность (0% — только Figma). Тяните картинку мышью, чтобы совместить; двойной клик — сброс.',
+    hint_diff:'Совпадающие пиксели чёрные, светлое — отличия. Тяните картинку мышью, чтобы совместить; двойной клик — сброс. Розовое — одна из картинок короче.',
+    hint_side:'Исходная склейка: Figma первой (слева), наша — второй.',
+    shifted:'наша сдвинута: {x}, {y} px (двойной клик — сброс)', oursOpacity:'наша:',
+    page:'Страница', figmaH:'Figma {f}px · наша {o}px', delta:'Δh {d}px', oursH:'наша {o}px',
+    built:'Галерея собрана {t} (v={v})', setBuild:'{l} — {b}',
+    scoreHint:'Клик по ячейке — снимок секции: наша | Figma | разница (pixel-diff, красное — отличия).',
+    scoreNote:'Пиксельное сравнение каждой секции с её узлом Figma (шаг 5 скилла pixel-perfect). В скобках — разница высоты/ширины в CSS px (наша минус Figma). pixel-diff выравнивает по левому верхнему углу, поэтому один более высокий элемент сдвигает всё ниже — процент годится для ранжирования и отслеживания, судить надо по картинке разницы.',
+    refNote:'Набор эталонов «{r}». ¹ — для этой ячейки экспорт Figma заменён исправленным эталоном (наведите, чтобы увидеть почему).',
+    section:'Секция', mean:'P/W/F · среднее', worst:'10 худших секций', worstCols:['#','Страница · секция · вид','Разница','Figma vs наша (CSS px)','Заметка'],
+    capture:'Наша (capture)', ref:'Figma (ref)', diffImg:'Разница (pixel-diff)', noShot:'нет снимка', node:'узел',
+    findNote:'Главные находки с доказательствами. Важность: высокая / средняя / низкая; «вопрос» — решает дизайнер.',
+    noScore:'Для этого набора снимков нет таблицы.', total:'Всего',
+    rgSame:'ОДИНАКОВО — во всех видах страниц 0 изменённых пикселей, тот же &lt;head&gt;, статус, консоль и картинки.', rgDiff:'ЕСТЬ РАЗЛИЧИЯ — отличаются {n} из {m} видов страниц.',
+    rgRules:'Правила: {r}.', rgMasked:'Скрыто масками (не сравнивалось): {m}; видео: {v}.', rgNothing:'ничего',
+    rgCols:['Страница · вид','Статус A/B','Изменённых px','Размер','Head','Консоль A/B','Битые картинки A/B','Итог'], same:'тот же', identical:'одинаково', differs:'отличается',
+    rgHead:'Различия в &lt;head&gt;', rgSections:'Секции', rgDiffImg:'A | B | изменённые пиксели (красные), обрезано по области изменений'
+  }
+};
+const T = Object.assign({}, I18N.en, I18N[DATA.lang] || {}, DATA.i18n || {});
+const fmt = (s, o) => s.replace(/\{(\w+)\}/g, (_, k) => o[k]);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const u = src => src + (src.includes('?') ? '&' : '?') + 'v=' + DATA.version;   // cache busting
+document.documentElement.lang = DATA.lang || 'en';
+document.title = DATA.title;
+const $ = id => document.getElementById(id);
+$('title').textContent = DATA.title;
+$('sub').innerHTML = DATA.subtitle || '';
+$('builds').innerHTML = DATA.sets.map(s => fmt(T.setBuild, {l:`<b>${esc(s.label)}</b>`, b:esc(s.build || '?')})).join(' · ') + ' · ' + fmt(T.built, {t:DATA.built, v:DATA.version});
+
+const SETS = DATA.sets;                       // [{key,label,build}], oldest first
+const LATEST = SETS[SETS.length-1].key;
+const VIEWS = DATA.views.map(v => [v.key, v.label || `${v.width >= 1000 ? T.desktop : T.mobile} ${v.width} · ${v.themeLabel || v.theme}`, v.width]);
+const MODES = [['swipe',T.swipe],['fade',T.fade],['diff',T.diff],['side',T.side]];
+const TABS = [...(DATA.find && DATA.find.length ? [['find', T.findings]] : []),
+              ...Object.entries(DATA.pages).map(([k,p]) => [k, p.title + (p.nocomp ? `<span class="nd">· ${T.noDesign}</span>` : '')]),
+              ...(DATA.score && Object.keys(DATA.score).length ? [['score', T.score]] : []),
+              ...(DATA.regress && DATA.regress.length ? [['regress', T.regress]] : [])];
+const KEY = 'dcg:' + (DATA.storageKey || DATA.title);
+let st = Object.assign({cur:TABS[0][0], view:VIEWS[0][0], mode:'swipe', fade:50, ver:LATEST, ref:null, rg:0}, JSON.parse(localStorage.getItem(KEY) || '{}'));
+if (!TABS.some(t => t[0] === st.cur)) st.cur = TABS[0][0];
+if (!VIEWS.some(v => v[0] === st.view)) st.view = VIEWS[0][0];
+if (!SETS.some(s => s.key === st.ver)) st.ver = LATEST;
+if (location.hash.slice(1) && TABS.some(t => t[0] === location.hash.slice(1))) st.cur = location.hash.slice(1);
+const imgs = {};
+window.__dcgImgErrors = [];
+function load(src){ if(!imgs[src]){ const i=new Image(); i.src=u(src); imgs[src]=new Promise(r=>{ i.onload=()=>r(i); i.onerror=()=>{ window.__dcgImgErrors.push(src); r(null); }; }); } return imgs[src]; }
+function save(){ localStorage.setItem(KEY, JSON.stringify(st)); }
+function pick(bySet){ return bySet[st.ver] || bySet[LATEST] || Object.values(bySet)[0]; }
+function setTag(bySet){
+  if (SETS.length < 2) return '';
+  const k = bySet[st.ver] ? st.ver : (bySet[LATEST] ? LATEST : Object.keys(bySet)[0]);
+  const s = SETS.find(x => x.key === k);
+  return `<span class="tag set ${k===LATEST?'':'old'}" title="${esc(s ? s.build : '')}">${esc(s ? s.label : k)}</span>`;
+}
+
+function cellsOf(g, pi){
+  const [a,b] = g.pairs[pi];
+  if (g.o==='h') { const w=Math.min(a[1]-a[0], b[1]-b[0]); return {fig:[a[0],0,w,g.H], ours:[b[0],0,w,g.H], w, h:g.H}; }
+  const h=Math.min(a[1]-a[0], b[1]-b[0]); return {fig:[0,a[0],g.W,h], ours:[0,b[0],g.W,h], w:g.W, h};
+}
+async function draw(cv){
+  const im = await load(cv.dataset.src); if(!im) return;
+  const g = JSON.parse(cv.dataset.g), c = cellsOf(g, +cv.dataset.p);
+  if (cv.width!==c.w || cv.height!==c.h) { cv.width=c.w; cv.height=c.h; }
+  const x = cv.getContext('2d'); x.globalAlpha=1; x.globalCompositeOperation='source-over';
+  x.clearRect(0,0,c.w,c.h);
+  const F=c.fig, O=c.ours;
+  const fs = Math.max(12, Math.round(c.w/70));
+  if (st.mode==='swipe') {
+    const sx = Math.round(c.w * (cv._split ?? 0.5));
+    x.drawImage(im, O[0],O[1],O[2],O[3], 0,0,c.w,c.h);
+    x.save(); x.beginPath(); x.rect(0,0,sx,c.h); x.clip(); x.drawImage(im, F[0],F[1],F[2],F[3], 0,0,c.w,c.h); x.restore();
+    const lw = Math.max(2, c.w/400);
+    x.fillStyle='#ff2d9b'; x.fillRect(sx-lw/2,0,lw,c.h);
+    x.font=`600 ${fs}px -apple-system,sans-serif`;
+    const pad=fs*0.5, ty=fs*1.6;
+    const lab=(t,xx,al)=>{ x.textAlign=al; const tw=x.measureText(t).width; const bx= al==='right'? xx-tw-pad*2 : xx; x.fillStyle='rgba(255,45,155,.92)'; x.fillRect(bx, ty-fs*1.2, tw+pad*2, fs*1.6); x.fillStyle='#fff'; x.fillText(t, al==='right'? xx-pad : xx+pad, ty); };
+    if (sx>fs*5) lab(T.figma, sx-lw, 'right');
+    if (c.w-sx>fs*5) lab(T.ours, sx+lw, 'left');
+  } else if (st.mode==='fade') {
+    x.drawImage(im, F[0],F[1],F[2],F[3], 0,0,c.w,c.h);
+    x.globalAlpha = st.fade/100; x.drawImage(im, O[0],O[1],O[2],O[3], cv._dx||0,cv._dy||0,c.w,c.h);
+  } else if (st.mode==='diff') {
+    x.drawImage(im, F[0],F[1],F[2],F[3], 0,0,c.w,c.h);
+    x.globalCompositeOperation='difference'; x.drawImage(im, O[0],O[1],O[2],O[3], cv._dx||0,cv._dy||0,c.w,c.h);
+  }
+  if ((st.mode==='fade'||st.mode==='diff') && (cv._dx||cv._dy)) {
+    x.globalAlpha=1; x.globalCompositeOperation='source-over';
+    x.font=`600 ${fs}px -apple-system,sans-serif`; const t=fmt(T.shifted, {x:Math.round(cv._dx||0), y:Math.round(cv._dy||0)});
+    const tw=x.measureText(t).width; x.fillStyle='rgba(255,45,155,.92)'; x.fillRect(8,8,tw+16,fs*1.7); x.fillStyle='#fff'; x.textAlign='left'; x.fillText(t,16,8+fs*1.2);
+  }
+  cv.dataset.drawn = '1';
+}
+const io = new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting && !e.target._drawn){ e.target._drawn=true; draw(e.target); } }), {rootMargin:'600px'});
+function zoom(src){ $('lbimg').src=src; $('lb').style.display='block'; }
+function block(label, it, extra, meta, plain){
+  const g = it.g, src = it.src;
+  const narrow = it.width && it.width < 1000;
+  let body;
+  const asImg = plain || st.mode==='side' || !g || !g.pairs || !g.pairs.length;
+  if (asImg) {
+    body = `<img class="side" loading="lazy" src="${u(src)}" alt="" onclick="zoom(this.src)">`;
+  } else {
+    body = `<div class="pairs">` + g.pairs.map((_,i)=>`<div class="pair ${st.mode}"><canvas data-src="${src}" data-g='${JSON.stringify(g)}' data-p="${i}"></canvas></div>`).join('') + `</div>`;
+  }
+  // canvas modes show ONE column (Figma and ours overlaid): about 1:1; the raw composite is two columns
+  const cols = asImg && g && g.pairs && g.pairs.length ? 2 : 1;
+  const nw = narrow ? ` style="--nw:${Math.max(360, (cols === 1 ? it.width + 2 : Math.round(it.width * cols * 1.05)))}px"` : '';
+  return `<div class="sec ${narrow?'narrow':'desk'}"${nw}><h3><span>${extra||''}${label}${meta?` <span class="meta">${meta}</span>`:''}</span><a href="${u(src)}" target="_blank">${T.openFile}</a></h3>${body}</div>`;
+}
+function wire(){
+  document.querySelectorAll('canvas[data-src]').forEach(cv=>{
+    io.observe(cv);
+    if (st.mode==='swipe') {
+      const mv = ev=>{ const r=cv.getBoundingClientRect(); cv._split=Math.min(1,Math.max(0,(ev.clientX-r.left)/r.width)); draw(cv); };
+      cv.addEventListener('mousemove', mv); cv.addEventListener('touchmove', e=>{ mv(e.touches[0]); e.preventDefault(); }, {passive:false});
+    } else if (st.mode==='fade' || st.mode==='diff') {
+      let d=null;
+      cv.addEventListener('mousedown', e=>{ d={x:e.clientX,y:e.clientY,dx:cv._dx||0,dy:cv._dy||0}; e.preventDefault(); });
+      window.addEventListener('mouseup', ()=>{ d=null; });
+      cv.addEventListener('mousemove', e=>{ if(!d) return; const k=cv.width/cv.getBoundingClientRect().width; cv._dx=d.dx+(e.clientX-d.x)*k; cv._dy=d.dy+(e.clientY-d.y)*k; draw(cv); });
+      cv.addEventListener('dblclick', ()=>{ cv._dx=0; cv._dy=0; draw(cv); });
+    }
+  });
+}
+function controls(showViews, showModes, showSets=true){
+  $('vers').innerHTML = showSets && SETS.length > 1 ? SETS.map(s=>`<button class="${s.key===st.ver?'on':''}" data-ver="${s.key}" title="${esc(s.build)}" onclick="st.ver='${s.key}';save();render(true)">${esc(s.label)}</button>`).join('') : '';
+  $('refs').innerHTML = '';
+  $('views').style.display = showViews ? '' : 'none';
+  if (showViews) {
+    const p = DATA.pages[st.cur];
+    $('views').innerHTML = VIEWS.map(([k,t])=>{ const parts = new Set((p.views[k]||[]).filter(x=>!x.overview).map(x=>x.order)).size;
+      return `<button class="${k===st.view?'on':''}" data-view="${k}" ${p.views[k]?'':'disabled'} onclick="st.view='${k}';save();render()">${t} (${parts})</button>`; }).join('');
+  }
+  $('modes').innerHTML = showModes ? MODES.map(([k,t])=>`<button class="${k===st.mode?'on':''}" data-mode="${k}" onclick="st.mode='${k}';save();render(true)">${t}</button>`).join('') : '';
+  if (!showModes) { $('ctl').innerHTML=''; return; }
+  $('ctl').innerHTML = st.mode==='fade' ? `${T.oursOpacity} <input type="range" min="0" max="100" value="${st.fade}" oninput="st.fade=+this.value;this.nextElementSibling.textContent=this.value+'%';save();document.querySelectorAll('canvas[data-src]').forEach(c=>c._drawn&&draw(c))"><span>${st.fade}%</span><span class="hint" style="margin-left:8px">${T.hint_fade}</span>` : `<span class="hint">${T['hint_'+st.mode]}</span>`;
+}
+function renderPage(){
+  const p = DATA.pages[st.cur]; controls(true, !p.nocomp);
+  $('legend').innerHTML = `${T.page}: <b>${esc(p.url)}</b>`;
+  const items = p.views[st.view];
+  if (!items) { $('main').innerHTML = `<div class="empty">${fmt(T.noView,{v:st.view})}</div>`; return; }
+  let h = p.nocomp ? `<div class="note">${T.noDesignNote}</div>` : '';
+  const w = (p.warn||{})[st.view];
+  if (w) h += `<div class="warn">${w}</div>`;
+  h += items.map(x=>{
+    const it = pick(x.bySet);
+    const label = x.overview ? fmt(T.overview,{s:Math.round((it.scale||1)*100)}) + (it.parts>1?` · ${T.part} ${it.part}/${it.parts}`:'')
+      : `${String(x.order).padStart(2,'0')} · ${esc(x.label)}${it.parts>1?` · ${T.part} ${it.part}/${it.parts}`:''}`;
+    const meta = x.overview ? '' : p.nocomp ? fmt(T.oursH,{o:it.oh}) :
+      `${esc(x.figmaName||'')} <code>${x.figmaId||''}</code> · ${fmt(T.figmaH,{f:it.fh,o:it.oh})} · ${fmt(T.delta,{d:(it.oh-it.fh>0?'+':'')+(it.oh-it.fh)})}`;
+    return block(label, it, setTag(x.bySet), (it.part||1)===1 ? meta : '', p.nocomp);
+  }).join('');
+  $('main').innerHTML = h || `<div class="empty">${T.noImages}</div>`;
+}
+function renderFind(){
+  controls(false, true);
+  $('legend').innerHTML = '';
+  $('main').innerHTML = `<div class="note">${DATA.findNote || T.findNote}</div>` +
+    DATA.find.map(f=>{ const it = pick(f.bySet); return block(f.text, it, `${setTag(f.bySet)}<span class="tag">${esc(f.id)}</span>${f.severity?`<span class="tag sev-${f.severity}">${esc(f.sevLabel||f.severity)}</span>`:''}`, f.page||''); }).join('');
+}
+function fitBar(){ document.documentElement.style.setProperty('--hh', $('hdr').offsetHeight+'px'); }
+window.addEventListener('resize', fitBar);
+function render(keepScroll){
+  $('tabs').innerHTML = TABS.map(([k,t])=>`<button class="${k===st.cur?'on':''}" data-tab="${k}" onclick="st.cur='${k}';location.hash='${k}';save();render()">${t}</button>`).join('');
+  fitBar();   // after the tabs exist: measured before, the sticky bar sat under the header on first load
+  if (st.cur==='score') renderScore();
+  else if (st.cur==='regress') renderRegress();
+  else if (st.cur==='find') renderFind();
+  else renderPage();
+  wire(); if(!keepScroll) window.scrollTo(0,0);
+}
+function scCell(c){
+  if(!c) return '<td>—</td>';
+  const v=(c.verdict||'').replace(' ','');
+  const alt = c.refset ? ` title="${esc(c.refNote || '(no reason recorded)')}"` : '';
+  if(c.diff==null) return `<td class="c ${v}" title="${esc(c.error||c.note||'')}">${c.verdict}</td>`;
+  const bw=Math.abs(c.dw||0)>=1, bh=Math.abs(c.dh||0)>=1; const sz = (bh||bw) ? ` <small>(${c.dh>0?'+':''}${c.dh}h${bw?`, ${c.dw>0?'+':''}${c.dw}w`:''})</small>` : '';
+  return `<td class="c ${v}"${alt}>${c.diff.toFixed(2)}% ${c.verdict}${sz}${c.refset?' ¹':''}</td>`;
+}
+function renderScore(){
+  const bySet = DATA.score[st.ver] || DATA.score[LATEST] || Object.values(DATA.score)[0] || {};
+  controls(false, false);
+  const RS = Object.keys(bySet);
+  if (!st.ref || !bySet[st.ref]) st.ref = RS[0];
+  $('refs').innerHTML = RS.length > 1 ? RS.map(r=>`<button class="${r===st.ref?'on':''}" data-ref="${r}" onclick="st.ref='${r}';save();render(true)">${esc(r)} · ${bySet[r].total.PASS}/${bySet[r].total.WARN}/${bySet[r].total.FAIL}</button>`).join('') : '';
+  const B = bySet[st.ref];
+  $('ctl').innerHTML=`<span class="hint">${T.scoreHint}</span>`;
+  if (!B) { $('main').innerHTML = `<div class="empty">${T.noScore}</div>`; return; }
+  const COLS = B.columns;
+  $('legend').innerHTML = `pixel-diff · <b>${esc(B.baseUrl)}</b> · ${B.generated} · PASS &lt;0.5% · WARN &lt;2% · FAIL ≥2%`;
+  let h = `<div class="note">${T.scoreNote}${RS.length > 1 ? '<br>' + fmt(T.refNote, {r:esc(B.refset)}) : ''}</div>`;
+  h += `<div class="scoresum"><span><b>${T.total}</b>: ${B.total.PASS} PASS · ${B.total.WARN} WARN · ${B.total.FAIL} FAIL</span>` + Object.entries(B.summary).map(([k,v])=>`<span><b>${esc(k)}</b>: ${v.PASS} PASS · ${v.WARN} WARN · ${v.FAIL} FAIL${v.ERROR?` · ${v.ERROR} ERR`:''}</span>`).join('') + '</div>';
+  B.pages.forEach((p,pi)=>{
+    h += `<div class="sec"><h3><span>${esc(p.title)} — ${esc(p.route)}</span></h3><div style="padding:12px;overflow:auto"><table class="score"><tr><th>${T.section}</th>${COLS.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+    p.sections.forEach((r,ri)=>{ h += `<tr><td>${esc(r.section)}</td>` + COLS.map(k=>scCell(r.cells[k]).replace('<td class="c',`<td data-k="${pi}|${ri}|${k}" class="c`)).join('') + '</tr>'; });
+    const t=p.totals; h += `<tr><th>${T.mean}</th>${COLS.map(k=>`<th>${t[k]?`${t[k].PASS}/${t[k].WARN}/${t[k].FAIL} · ${t[k].meanDiff??'—'}%`:'—'}</th>`).join('')}</tr></table></div><div id="trio-${pi}"></div></div>`;
+  });
+  if (B.worst && B.worst.length) {
+    h += `<div class="sec"><h3><span>${T.worst}</span></h3><div style="padding:12px;overflow:auto"><table class="score"><tr>${T.worstCols.map(c=>`<th>${c}</th>`).join('')}</tr>` +
+      B.worst.map((w,i)=>`<tr><td>${i+1}</td><td>${esc(w.page)} · ${esc(w.section)} · ${w.view}</td><td>${w.diff.toFixed(2)}%</td><td>${w.figma&&w.ours?`${w.figma.join('×')} vs ${w.ours.join('×')}`:'—'}</td><td style="white-space:normal;min-width:320px">${esc(w.note||'')}</td></tr>`).join('') + '</table></div></div>';
+  }
+  $('main').innerHTML = h;
+  document.querySelectorAll('td.c[data-k]').forEach(td=>td.addEventListener('click',()=>{
+    const [pi,ri,k]=td.dataset.k.split('|'); const p=B.pages[+pi], r=p.sections[+ri], c=r.cells[k];
+    document.querySelectorAll('td.c.sel').forEach(x=>x.classList.remove('sel')); td.classList.add('sel');
+    const box=$('trio-'+pi);
+    if(!c||!c.img){ box.innerHTML=`<div class="empty">${esc(p.title)} · ${esc(r.section)} · ${k}: ${T.noShot} (${c?c.verdict:'—'}${c&&c.error?': '+esc(c.error):''})</div>`; return; }
+    const fig=(t,src)=>`<figure><figcaption>${t}</figcaption><img src="${u(src)}" alt="${t}" onclick="zoom(this.src)"></figure>`;
+    box.innerHTML = `<div class="hint" style="padding:8px 12px 0">${esc(p.title)} · ${esc(r.section)} · ${k} · ${T.node} ${c.node} · ${c.diff!=null?c.diff.toFixed(2)+'% '+c.verdict:''}${c.figma?` · Figma ${c.figma.join('×')} · ${T.ours} ${c.ours.join('×')}`:''}${c.note?` · <i>${esc(c.note)}</i>`:''}${c.refset?` · ¹ ${esc(c.refNote||'')}`:''}</div><div class="trio">${fig(T.capture,c.img.capture)}${fig(T.ref,c.img.ref)}${fig(T.diffImg,c.img.diff)}</div>`;
+  }));
+}
+function renderRegress(){
+  controls(false, false, false);
+  const R = DATA.regress;
+  if (st.rg >= R.length) st.rg = 0;
+  $('vers').innerHTML = R.length > 1 ? R.map((r,i)=>`<button class="${i===st.rg?'on':''}" data-rg="${i}" onclick="st.rg=${i};save();render(true)">${esc(r.id)}</button>`).join('') : '';
+  const r = R[st.rg];
+  $('legend').innerHTML = `A <b>${esc(r.a)}</b> · B <b>${esc(r.b)}</b> · ${r.generated}`;
+  const nd = r.rows.filter(x=>!x.identical).length;
+  let h = r.identical ? `<div class="ok">${T.rgSame}</div>` : `<div class="bad">${fmt(T.rgDiff,{n:nd,m:r.rows.length})}</div>`;
+  h += `<div class="note">${fmt(T.rgRules,{r:esc(r.rules)})}<br>${fmt(T.rgMasked,{m:r.masked.length?r.masked.map(m=>`<code>${esc(m)}</code>`).join(', '):T.rgNothing, v:esc(r.videos)})}</div>`;
+  h += `<div class="sec"><div style="padding:12px;overflow:auto"><table class="score"><tr>${T.rgCols.map(c=>`<th>${c}</th>`).join('')}</tr>` + r.rows.map(x=>{
+    const size = x.sameSize ? T.same : (x.sizeA ? `${x.sizeA.join('×')} → ${x.sizeB.join('×')}` : '—');
+    return `<tr><td>${esc(x.title||x.page)} · ${x.view}</td><td>${x.statusA}/${x.statusB}</td><td>${x.changed==null?'—':x.changed}</td><td>${size}</td><td>${x.head.length}</td><td>${x.consoleA.length}/${x.consoleB.length}</td><td>${x.brokenA.length}/${x.brokenB.length}</td><td class="${x.identical?'SAME':'DIFF'}">${x.identical?T.identical:T.differs}</td></tr>`; }).join('') + '</table></div></div>';
+  r.rows.filter(x=>!x.identical).forEach(x=>{
+    let b = '';
+    if (x.head.length) b += `<div style="padding:10px 14px"><b>${T.rgHead}</b><ul class="plain">${x.head.map(d=>`<li>${esc(d.field)}: <code>${esc(JSON.stringify(d.a))}</code> → <code>${esc(JSON.stringify(d.b))}</code></li>`).join('')}</ul></div>`;
+    const cs = (x.sections||[]).filter(s=>s.status!=='identical');
+    if (cs.length) b += `<div style="padding:10px 14px"><b>${T.rgSections}</b><ul class="plain">${cs.map(s=>`<li>${esc(s.label)}: ${esc(s.status)}${s.changed?` · ${s.changed} px`:''}</li>`).join('')}</ul></div>`;
+    const ce = [...x.consoleA.map(t=>'A: '+t), ...x.consoleB.map(t=>'B: '+t)];
+    if (x.consoleA.join()!==x.consoleB.join() && ce.length) b += `<div style="padding:10px 14px"><ul class="plain">${ce.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`;
+    if (x.diffImage) b += `<div class="hint" style="padding:0 14px">${T.rgDiffImg}</div><img class="side" loading="lazy" src="${u(x.diffImage)}" alt="" onclick="zoom(this.src)">`;
+    h += `<div class="sec"><h3><span>${esc(x.title||x.page)} · ${x.view} · ${x.changed??'—'} px</span></h3>${b}</div>`;
+  });
+  $('main').innerHTML = h;
+}
+window.addEventListener('hashchange',()=>{ const k=location.hash.slice(1); if (TABS.some(t=>t[0]===k) && k!==st.cur) { st.cur=k; render(); } });
+document.addEventListener('keydown', e=>{ if (e.key==='Escape') $('lb').style.display='none'; });
+render();
+</script>
+</body>
+</html>

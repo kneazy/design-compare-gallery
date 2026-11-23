@@ -1,0 +1,90 @@
+{
+  "name": "my-site",
+  "title": "My site — Figma vs implementation",
+  "subtitle": "Captured from the local dev server; every picture is the Figma frame and our page at the same scale.",
+  "lang": "en",
+  "outputDir": "out",
+  "baseUrl": "http://127.0.0.1:3000",
+  "figma": {
+    "fileKey": "<file key from figma.com/design/<fileKey>/...>",
+    "token": "env:FIGMA_TOKEN",
+    "scale": 1
+  },
+  "widths": [
+    1440,
+    390
+  ],
+  "themes": {
+    "light": {
+      "localStorage": {
+        "theme": "light"
+      },
+      "background": "#ffffff",
+      "label": "light"
+    },
+    "dark": {
+      "localStorage": {
+        "theme": "dark"
+      },
+      "background": "#0b0c0e",
+      "label": "dark"
+    }
+  },
+  "localStorage": {
+    "cookieConsent": "rejected"
+  },
+  "capture": {
+    "viewportHeight": 900,
+    "waitMs": 800,
+    "hide": [],
+    "videos": "hide",
+    "noise": "challenges\\.cloudflare\\.com|googletagmanager",
+    "fixedTime": null
+  },
+  "sections": {
+    "selector": "main > section",
+    "header": "header",
+    "label": "id",
+    "labelStrip": null,
+    "figmaSkip": "^(Footer|Header)$"
+  },
+  "composite": {
+    "chunk": 2400,
+    "overviewColumn": 480
+  },
+  "sets": {
+    "before": "Before fixes",
+    "now": "Now"
+  },
+  "lock": null,
+  "pages": [
+    {
+      "key": "home",
+      "title": "Home",
+      "route": "/",
+      "frames": {
+        "1440-light": "1:2",
+        "1440-dark": "1:3",
+        "390-light": "1:4",
+        "390-dark": "1:5"
+      },
+      "map": {
+        "skipDom": {},
+        "skipFigma": {},
+        "merge": {},
+        "split": {}
+      },
+      "scoreNotes": {}
+    },
+    {
+      "key": "about",
+      "title": "About (no design yet)",
+      "route": "/about"
+    }
+  ],
+  "buildId": {},
+  "regress": {
+    "mask": [],
+    "keepCaptures": false
+  }
+}

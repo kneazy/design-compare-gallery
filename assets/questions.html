@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design questions</title>
+<style>
+  :root { --bg:#f6f6f8; --fg:#16161a; --muted:#6b6b76; --line:#e2e2e8; --acc:#6d28d9; --card:#fff; }
+  * { box-sizing:border-box; }
+  html { scroll-padding-top:150px; }
+  body { margin:0; font:15px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; background:var(--bg); color:var(--fg); }
+  header { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--line); padding:12px 24px 0; }
+  .top { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+  h1 { font-size:18px; margin:0; }
+  .prog { color:var(--muted); font-size:13px; } .prog b { color:var(--fg); }
+  #copy { margin-left:auto; border:0; background:var(--acc); color:#fff; font:inherit; font-weight:600; padding:9px 18px; border-radius:9px; cursor:pointer; }
+  #copy:hover { background:#5b21b6; }
+  #copy:focus-visible, .chip input:focus-visible + span, .tabs a:focus-visible { outline:3px solid #c4b5fd; outline-offset:2px; }
+  .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-top:10px; }
+  .tabs a { border:1px solid var(--line); background:#fff; padding:6px 12px; border-radius:8px 8px 0 0; font-size:13px; color:var(--fg); text-decoration:none; border-bottom:none; }
+  .tabs a:hover { background:#f1ecfc; }
+  .tabs a.on { background:var(--acc); color:#fff; border-color:var(--acc); }
+  .tabs .cnt { opacity:.65; margin-left:2px; }
+  main { padding:18px 24px 120px; max-width:1500px; margin:0 auto; }
+  .note { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin:0 0 18px; font-size:14px; }
+  .note p { margin:0 0 8px; max-width:1000px; } .note p:last-child { margin:0; }
+  .grp h2 { font-size:20px; margin:30px 0 4px; }
+  .gdesc { margin:0 0 14px; color:var(--muted); max-width:1000px; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:6px; background:#ede9fe; color:#5b21b6; font-weight:600; margin-right:4px; }
+  .q { background:var(--card); border:1px solid var(--line); border-radius:12px; margin:0 0 18px; padding:14px 16px 16px; }
+  .q.answered { border-color:#a7f3d0; box-shadow:0 0 0 1px #a7f3d0 inset; }
+  .qh { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .num { font-weight:700; font-size:13px; background:var(--fg); color:#fff; padding:2px 9px; border-radius:6px; margin-right:6px; }
+  .src { margin-left:auto; font-size:12px; color:var(--muted); }
+  .q h3 { margin:8px 0 4px; font-size:16px; }
+  .prob { margin:0 0 10px; max-width:1100px; }
+  code { font:13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background:#f1f1f5; border:1px solid var(--line); padding:0 4px; border-radius:4px; }
+  .q.tall .qb { display:grid; grid-template-columns:minmax(260px,40%) 1fr; gap:18px; align-items:start; }
+  .evs { display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
+  .evs:empty { display:none; }
+  figure.ev { margin:0; background:#fafafb; border:1px solid var(--line); border-radius:10px; padding:8px; }
+  figure.ev a { display:block; cursor:zoom-in; }
+  figure.ev img { display:block; width:100%; height:auto; max-height:560px; object-fit:contain; margin:0 auto; border-radius:6px; }
+  .q.tall figure.ev img { max-height:640px; }
+  figcaption { font-size:12px; color:var(--muted); margin-top:6px; text-align:center; }
+  .hint { color:#9a9aa6; }
+  .tx { min-width:0; max-width:1100px; }
+  .det { margin:0 0 10px; padding-left:20px; color:#3a3a44; font-size:14px; } .det li { margin:2px 0; }
+  .lab { display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--acc); margin-right:6px; }
+  .now { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:8px 12px; margin:0 0 10px; font-size:14px; }
+  .fg { margin:0 0 10px; font-size:13px; display:flex; gap:6px 12px; flex-wrap:wrap; align-items:center; }
+  .fg a { color:var(--acc); text-decoration:none; border-bottom:1px dotted var(--acc); }
+  .fg a::after { content:" ↗"; font-size:11px; }
+  .opts { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
+  .chip { cursor:pointer; }
+  .chip input { position:absolute; opacity:0; pointer-events:none; }
+  .chip span { display:inline-block; border:1px solid #c9c9d3; background:#fff; border-radius:999px; padding:6px 14px; font-size:14px; transition:background .12s, border-color .12s; }
+  .chip span em { font-style:normal; color:var(--muted); font-size:12px; }
+  .chip:hover span { border-color:var(--acc); background:#faf8ff; }
+  .chip input:checked + span { background:var(--acc); border-color:var(--acc); color:#fff; }
+  .chip input:checked + span em { color:#ddd6fe; }
+  .chip input:checked + span code { background:rgba(255,255,255,.18); border-color:transparent; color:#fff; }
+  textarea.free { width:100%; font:inherit; font-size:14px; border:1px solid var(--line); border-radius:8px; padding:8px 10px; resize:vertical; background:#fcfcfd; }
+  textarea.free:focus, .fi:focus { outline:2px solid #c4b5fd; border-color:var(--acc); }
+  .facts { margin:0 0 12px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .frow { display:flex; gap:12px; align-items:flex-start; padding:8px 12px; border-bottom:1px solid #f0f0f4; } .frow:last-child { border-bottom:0; }
+  .fk { flex:1; min-width:0; font-size:14px; } .fw { color:var(--muted); font-size:13px; margin-top:2px; }
+  .fi { width:240px; max-width:40%; font:inherit; font-size:14px; border:1px solid var(--line); border-radius:7px; padding:6px 9px; background:#fcfcfd; }
+  .kind { font-size:11px; font-weight:700; padding:1px 7px; border-radius:6px; margin-right:6px; }
+  .k-placeholder { background:#fef3c7; color:#92400e; } .k-claim { background:#fee2e2; color:#991b1b; } .k-note { background:#e0f2fe; color:#075985; }
+  .rows { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .row { display:flex; gap:12px; padding:9px 14px; border-bottom:1px solid #f0f0f4; align-items:flex-start; } .row:last-child { border-bottom:0; }
+  .row .num { flex:none; margin-top:2px; }
+  .rt { font-size:14px; } .rd { font-size:14px; color:#3a3a44; margin-top:2px; }
+  #pv { margin:24px 0 0; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 16px; }
+  #pv summary { cursor:pointer; font-weight:600; }
+  #pvt { width:100%; height:260px; font:13px/1.4 ui-monospace, Menlo, monospace; border:1px solid var(--line); border-radius:8px; padding:8px; margin-top:8px; }
+  #toast { position:fixed; right:24px; bottom:24px; background:var(--fg); color:#fff; padding:10px 16px; border-radius:9px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:20; }
+  #toast.on { opacity:1; }
+  .lb { position:fixed; inset:0; background:rgba(0,0,0,.85); display:none; overflow:auto; z-index:30; cursor:zoom-out; }
+  .lb img { display:block; margin:20px auto; max-width:none; }
+  @media (max-width: 900px) { .q.tall .qb { display:block; } .fi { width:100%; max-width:none; } .frow { flex-direction:column; } }
+</style>
+</head>
+<body>
+<header id="hdr">
+  <div class="top">
+    <h1 id="h1"></h1>
+    <span class="prog" id="prog"></span>
+    <button id="copy" type="button"></button>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<main id="main"></main>
+<div id="toast" role="status"></div>
+<div class="lb" id="lb" onclick="this.style.display='none'"><img id="lbimg" alt=""></div>
+<script>
+/*DATA*/
+const I18N = {
+  en: { copy:'Copy answers', answered:'Answered <b id="done">0</b> of <b>{n}</b>', now:'What we did for now', figma:'Figma', zoom:'click to enlarge',
+        free:'Your own option or a comment', current:'current', value:'value, ok or remove', decision:'decision',
+        kinds:{placeholder:'placeholder', claim:'claim', note:'note'}, preview:'Preview of the answer text (appears after "Copy answers")',
+        copied:'Answers copied. Paste them into a message.', copyFail:'Could not copy automatically: the text is below, select and copy it.',
+        head:'Answers', date:'Date', answer:'Answer', comment:'Comment', asNow:'(as now)', none:'Unanswered: ', noneLeft:'none', noAnswer:'No answer needed.' },
+  ru: { copy:'Скопировать ответы', answered:'Отвечено <b id="done">0</b> из <b>{n}</b>', now:'Что сделали сейчас', figma:'Figma', zoom:'клик, чтобы увеличить',
+        free:'Свой вариант или комментарий', current:'сейчас так', value:'значение, ok или убрать', decision:'решение',
+        kinds:{placeholder:'заглушка', claim:'утверждение', note:'вне счёта'}, preview:'Предпросмотр текста ответов (появляется после нажатия «Скопировать ответы»)',
+        copied:'Ответы скопированы. Вставьте их в сообщение.', copyFail:'Не удалось скопировать автоматически: текст ниже, выделите и скопируйте.',
+        head:'Ответы', date:'Дата', answer:'Ответ', comment:'Комментарий', asNow:'(как сейчас)', none:'Без ответа: ', noneLeft:'нет', noAnswer:'Ответов не требуется.' }
+};
+const T = Object.assign({}, I18N.en, I18N[DATA.lang] || {}, DATA.i18n || {});
+document.documentElement.lang = DATA.lang || 'en';
+document.title = DATA.title;
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+const plain = s => String(s ?? '').replace(/`/g, '');
+
+// number every answerable card
+let n = 0; const CARDS = [];
+DATA.groups.forEach(g => {
+  (g.cards || []).forEach(c => { c.n = ++n; c.group = g; if (g.answer !== false) CARDS.push(c); });
+  (g.rows || []).forEach(r => { r.n = ++n; });
+});
+
+function card(c) {
+  const imgs = (c.images || []).map(i => `<figure class="ev"><a href="${esc(i.full)}" class="zoom" data-full="${esc(i.full)}"><img loading="lazy" src="${esc(i.web)}" alt="${esc(plain(i.cap))}" width="${i.w}" height="${i.h}"></a><figcaption>${fmt(i.cap)} <span class="hint">· ${T.zoom}</span></figcaption></figure>`).join('');
+  const tall = (c.images || []).some(i => i.h / i.w > 1.15);
+  const det = c.details && c.details.length ? `<ul class="det">${c.details.map(d => `<li>${fmt(d)}</li>`).join('')}</ul>` : '';
+  const facts = c.facts && c.facts.length ? `<div class="facts">${c.facts.map((f, k) => `<div class="frow"><div class="fk"><span class="kind k-${esc(f.kind)}">${esc(T.kinds[f.kind] || f.kind)}</span> <b>${f.kind === 'placeholder' ? `<code>${esc(f.text)}</code>` : fmt(f.text)}</b>${f.where ? `<div class="fw">${fmt(f.where)}</div>` : ''}</div><input type="text" class="fi" data-k="${k}" placeholder="${f.kind === 'note' ? T.decision : T.value}" aria-label="${esc(plain(f.text))}"></div>`).join('')}</div>` : '';
+  const figma = c.figma && c.figma.length ? `<div class="fg"><span class="lab">${T.figma}</span>${c.figma.map(([l, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${fmt(l)}</a>`).join('')}</div>` : '';
+  const answer = c.group.answer !== false;
+  const opts = answer && c.options ? `<div class="opts" role="radiogroup">${c.options.map((o, k) => `<label class="chip"><input type="radio" name="q${c.n}" value="${k}"><span>${fmt(o)}${k === (c.currentOption ?? 0) && c.now ? ` <em>(${T.current})</em>` : ''}</span></label>`).join('')}</div>` : '';
+  const free = answer ? `<textarea class="free" rows="2" placeholder="${T.free}" aria-label="${T.free}"></textarea>` : '';
+  return `<article class="q${tall ? ' tall' : ''}" id="q${c.n}" data-n="${c.n}">
+<div class="qh"><span class="num">№ ${c.n}</span>${(c.pages || []).map(p => `<span class="tag">${fmt(p)}</span>`).join('')}${c.src ? `<span class="src">${esc(c.src)}</span>` : ''}</div>
+<h3>${fmt(c.title)}</h3>${c.problem ? `<p class="prob">${fmt(c.problem)}</p>` : ''}
+<div class="qb"><div class="evs">${imgs}</div><div class="tx">${det}${facts}${c.now ? `<div class="now"><span class="lab">${T.now}</span> ${fmt(c.now)}</div>` : ''}${figma}${opts}${free}</div></div></article>`;
+}
+function rowsHtml(g) {
+  return `<div class="rows">${g.rows.map(r => `<div class="row" id="q${r.n}"><span class="num">№ ${r.n}</span><div><div class="rt">${(r.pages || []).map(p => `<span class="tag">${fmt(p)}</span>`).join('')} <b>${fmt(r.title)}</b></div>${r.decision ? `<div class="rd">${fmt(r.decision)}</div>` : ''}</div></div>`).join('')}</div>`;
+}
+$('#h1').textContent = DATA.title;
+$('#copy').textContent = T.copy;
+$('#prog').innerHTML = T.answered.replace('{n}', CARDS.length);
+$('#tabs').innerHTML = DATA.groups.map(g => `<a href="#${esc(g.id)}" data-g="${esc(g.id)}">${esc(g.title)} <span class="cnt">${(g.cards || g.rows || []).length}</span></a>`).join('');
+$('#main').innerHTML = (DATA.intro && DATA.intro.length ? `<div class="note">${DATA.intro.map(p => `<p>${fmt(p)}</p>`).join('')}</div>` : '') +
+  DATA.groups.map(g => `<section class="grp" id="${esc(g.id)}"><h2>${esc(g.title)}</h2>${g.desc ? `<p class="gdesc">${fmt(g.desc)}</p>` : (g.answer === false ? `<p class="gdesc">${T.noAnswer}</p>` : '')}${(g.cards || []).map(card).join('')}${g.rows ? rowsHtml(g) : ''}</section>`).join('') +
+  `<details id="pv"><summary>${T.preview}</summary><textarea id="pvt" readonly></textarea></details>`;
+
+const KEY = 'dcg-q:' + (DATA.storageKey || DATA.title);
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { state = {}; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function st(n) { return state[n] || (state[n] = { opt: null, text: '', items: {} }); }
+function answered(n) { const s = state[n]; if (!s) return false; return s.opt !== null || (s.text || '').trim() !== '' || Object.values(s.items || {}).some(v => (v || '').trim() !== ''); }
+function refresh() { let d = 0; CARDS.forEach(c => { const a = answered(c.n); if (a) d++; $('#q' + c.n).classList.toggle('answered', a); }); $('#done').textContent = d; }
+CARDS.forEach(c => {
+  const el = $('#q' + c.n), s = state[c.n]; if (!s) return;
+  if (s.opt !== null) { const r = $(`input[type=radio][value="${s.opt}"]`, el); if (r) r.checked = true; }
+  const t = $('textarea.free', el); if (t) t.value = s.text || '';
+  $$('.fi', el).forEach(i => { i.value = (s.items || {})[i.dataset.k] || ''; });
+});
+$$('.chip input').forEach(r => {
+  r.closest('label').addEventListener('mousedown', () => { r.dataset.was = r.checked ? '1' : ''; });
+  r.addEventListener('click', () => {   // a second click on the chosen chip clears it
+    const n = r.closest('.q').dataset.n;
+    if (r.dataset.was === '1') { r.checked = false; st(n).opt = null; } else { st(n).opt = Number(r.value); }
+    r.dataset.was = ''; save(); refresh();
+  });
+});
+$$('textarea.free').forEach(t => t.addEventListener('input', () => { st(t.closest('.q').dataset.n).text = t.value; save(); refresh(); }));
+$$('.fi').forEach(i => i.addEventListener('input', () => { st(i.closest('.q').dataset.n).items[i.dataset.k] = i.value; save(); refresh(); }));
+$$('a.zoom').forEach(a => a.addEventListener('click', e => { e.preventDefault(); $('#lbimg').src = a.dataset.full; $('#lb').style.display = 'block'; }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#lb').style.display = 'none'; });
+const obs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) $$('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.g === e.target.id)); }), { rootMargin: '-160px 0px -70% 0px' });
+$$('section.grp').forEach(s => obs.observe(s));
+refresh();
+
+function buildText() {
+  const out = [`${T.head}: ${DATA.title}`, `${T.date}: ${new Date().toISOString().slice(0, 10)}`, ''];
+  const skipped = [];
+  CARDS.forEach(c => {
+    const s = state[c.n];
+    if (!answered(c.n)) { skipped.push('№' + c.n); return; }
+    out.push(`№${c.n} · ${plain(c.title)}${c.pages && c.pages.length ? ` (${plain(c.pages.join(', '))})` : ''}`);
+    if (s.opt !== null && c.options) out.push(`  ${T.answer}: ${plain(c.options[s.opt])}${s.opt === (c.currentOption ?? 0) && c.now ? ' ' + T.asNow : ''}`);
+    (c.facts || []).forEach((f, k) => { const v = ((s.items || {})[k] || '').trim(); if (v) out.push(`  ${plain(f.text)} → ${v}`); });
+    if ((s.text || '').trim()) out.push(`  ${T.comment}: ${s.text.trim().replace(/\n+/g, ' / ')}`);
+    out.push('');
+  });
+  out.push(T.none + (skipped.length ? skipped.join(', ') : T.noneLeft));
+  return out.join('\n');
+}
+async function copyText(t) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t); return true; } } catch (e) {}
+  const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+  ta.remove(); return ok;
+}
+$('#copy').addEventListener('click', async () => {
+  const t = buildText(); $('#pvt').value = t; $('#pv').open = true;
+  const ok = await copyText(t);
+  const toast = $('#toast'); toast.textContent = ok ? T.copied : T.copyFail;
+  toast.classList.add('on'); setTimeout(() => toast.classList.remove('on'), 3500);
+});
+</script>
+</body>
+</html>
